@@ -84,7 +84,8 @@ extern "C" int LLVMFuzzerTestOneInput(uint8_t const* _data, size_t _size)
 	yulFuzzerUtil::TerminationReason termReason = yulFuzzerUtil::interpret(
 		os1,
 		stack.parserResult()->code,
-		EVMDialect::strictAssemblyForEVMObjects(langutil::EVMVersion())
+		EVMDialect::strictAssemblyForEVMObjects(langutil::EVMVersion()),
+		true
 	);
 	if (yulFuzzerUtil::resourceLimitsExceeded(termReason))
 		return 0;
@@ -93,7 +94,8 @@ extern "C" int LLVMFuzzerTestOneInput(uint8_t const* _data, size_t _size)
 	termReason = yulFuzzerUtil::interpret(
 		os2,
 		stack.parserResult()->code,
-		EVMDialect::strictAssemblyForEVMObjects(langutil::EVMVersion())
+		EVMDialect::strictAssemblyForEVMObjects(langutil::EVMVersion()),
+		true
 	);
 
 	if (yulFuzzerUtil::resourceLimitsExceeded(termReason))

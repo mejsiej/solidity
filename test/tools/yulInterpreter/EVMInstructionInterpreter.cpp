@@ -99,6 +99,7 @@ u256 EVMInstructionInterpreter::eval(
 	switch (_instruction)
 	{
 	case Instruction::STOP:
+		logTrace(_instruction, false);
 		BOOST_THROW_EXCEPTION(ExplicitlyTerminated());
 	// --------------- arithmetic ---------------
 	case Instruction::ADD:
@@ -204,6 +205,7 @@ u256 EVMInstructionInterpreter::eval(
 	case Instruction::CALLDATASIZE:
 		return m_state.calldata.size();
 	case Instruction::CALLDATACOPY:
+		logTrace(_instruction, true, arg);
 		if (accessMemory(arg[0], arg[2]))
 			copyZeroExtended(
 				m_state.memory, m_state.calldata,
@@ -213,6 +215,7 @@ u256 EVMInstructionInterpreter::eval(
 	case Instruction::CODESIZE:
 		return m_state.code.size();
 	case Instruction::CODECOPY:
+		logTrace(_instruction, true, arg);
 		if (accessMemory(arg[0], arg[2]))
 			copyZeroExtended(
 				m_state.memory, m_state.code,
@@ -230,7 +233,7 @@ u256 EVMInstructionInterpreter::eval(
 	case Instruction::EXTCODEHASH:
 		return u256(keccak256(h256(arg[0] + 1)));
 	case Instruction::EXTCODECOPY:
-		logTrace(_instruction, arg);
+		logTrace(_instruction, true, arg);
 		if (accessMemory(arg[1], arg[3]))
 			// TODO this way extcodecopy and codecopy do the same thing.
 			copyZeroExtended(
@@ -241,7 +244,7 @@ u256 EVMInstructionInterpreter::eval(
 	case Instruction::RETURNDATASIZE:
 		return m_state.returndata.size();
 	case Instruction::RETURNDATACOPY:
-		logTrace(_instruction, arg);
+		logTrace(_instruction, true, arg);
 		if (accessMemory(arg[0], arg[2]))
 			copyZeroExtended(
 				m_state.memory, m_state.returndata,
@@ -288,63 +291,69 @@ u256 EVMInstructionInterpreter::eval(
 		return 0x99;
 	case Instruction::LOG0:
 		accessMemory(arg[0], arg[1]);
-		logTrace(_instruction, arg);
+		logTrace(_instruction, false, arg);
 		return 0;
 	case Instruction::LOG1:
 		accessMemory(arg[0], arg[1]);
-		logTrace(_instruction, arg);
+		logTrace(_instruction, false, arg);
 		return 0;
 	case Instruction::LOG2:
 		accessMemory(arg[0], arg[1]);
-		logTrace(_instruction, arg);
+		logTrace(_instruction, false, arg);
 		return 0;
 	case Instruction::LOG3:
 		accessMemory(arg[0], arg[1]);
-		logTrace(_instruction, arg);
+		logTrace(_instruction, false, arg);
 		return 0;
 	case Instruction::LOG4:
 		accessMemory(arg[0], arg[1]);
-		logTrace(_instruction, arg);
+		logTrace(_instruction, false, arg);
 		return 0;
 	// --------------- calls ---------------
 	case Instruction::CREATE:
 		accessMemory(arg[1], arg[2]);
-		logTrace(_instruction, arg);
+		logTrace(_instruction, false, arg);
 		return (0xcccccc + arg[1]) & u256("0xffffffffffffffffffffffffffffffffffffffff");
 	case Instruction::CREATE2:
 		accessMemory(arg[2], arg[3]);
-		logTrace(_instruction, arg);
+		logTrace(_instruction, false, arg);
 		return (0xdddddd + arg[1]) & u256("0xffffffffffffffffffffffffffffffffffffffff");
 	case Instruction::CALL:
 	case Instruction::CALLCODE:
 		// TODO assign returndata
 		accessMemory(arg[3], arg[4]);
 		accessMemory(arg[5], arg[6]);
-		logTrace(_instruction, arg);
+		logTrace(_instruction, false, arg);
 		return arg[0] & 1;
 	case Instruction::DELEGATECALL:
 	case Instruction::STATICCALL:
 		accessMemory(arg[2], arg[3]);
 		accessMemory(arg[4], arg[5]);
-		logTrace(_instruction, arg);
+		logTrace(_instruction, false, arg);
 		return 0;
 	case Instruction::RETURN:
 	{
 		bytes data;
 		if (accessMemory(arg[0], arg[1]))
 			data = readMemory(arg[0], arg[1]);
-		logTrace(_instruction, arg, data);
+		logTrace(_instruction, false, arg, data);
 		BOOST_THROW_EXCEPTION(ExplicitlyTerminated());
 	}
 	case Instruction::REVERT:
 		accessMemory(arg[0], arg[1]);
-		logTrace(_instruction, arg);
+		logTrace(_instruction, false, arg);
+		m_state.storage.clear();
+		m_state.trace.clear();
 		BOOST_THROW_EXCEPTION(ExplicitlyTerminated());
 	case Instruction::INVALID:
-		logTrace(_instruction);
+		logTrace(_instruction, false);
+		m_state.storage.clear();
+		m_state.trace.clear();
 		BOOST_THROW_EXCEPTION(ExplicitlyTerminated());
 	case Instruction::SELFDESTRUCT:
-		logTrace(_instruction, arg);
+		logTrace(_instruction, false, arg);
+		m_state.storage.clear();
+		m_state.trace.clear();
 		BOOST_THROW_EXCEPTION(ExplicitlyTerminated());
 	case Instruction::POP:
 		break;
@@ -505,23 +514,36 @@ void EVMInstructionInterpreter::writeMemoryWord(u256 const& _offset, u256 const&
 }
 
 
-void EVMInstructionInterpreter::logTrace(evmasm::Instruction _instruction, std::vector<u256> const& _arguments, bytes const& _data)
+void EVMInstructionInterpreter::logTrace(
+	evmasm::Instruction _instruction,
+	bool _writesToMemory,
+	std::vector<u256> const& _arguments,
+	bytes const& _data
+)
 {
-	logTrace(evmasm::instructionInfo(_instruction).name, _arguments, _data);
+	logTrace(evmasm::instructionInfo(_instruction).name, _writesToMemory, _arguments, _data);
 }
 
-void EVMInstructionInterpreter::logTrace(std::string const& _pseudoInstruction, std::vector<u256> const& _arguments, bytes const& _data)
+void EVMInstructionInterpreter::logTrace(
+	std::string const& _pseudoInstruction,
+	bool _writesToMemory,
+	std::vector<u256> const& _arguments,
+	bytes const& _data
+)
 {
-	string message = _pseudoInstruction + "(";
-	for (size_t i = 0; i < _arguments.size(); ++i)
-		message += (i > 0 ? ", " : "") + formatNumber(_arguments[i]);
-	message += ")";
-	if (!_data.empty())
-		message += " [" + util::toHex(_data) + "]";
-	m_state.trace.emplace_back(std::move(message));
-	if (m_state.maxTraceSize > 0 && m_state.trace.size() >= m_state.maxTraceSize)
+	if (!(_writesToMemory && m_disableMemoryWriteInstructions))
 	{
-		m_state.trace.emplace_back("Trace size limit reached.");
-		BOOST_THROW_EXCEPTION(TraceLimitReached());
+		string message = _pseudoInstruction + "(";
+		for (size_t i = 0; i < _arguments.size(); ++i)
+			message += (i > 0 ? ", " : "") + formatNumber(_arguments[i]);
+		message += ")";
+		if (!_data.empty())
+			message += " [" + util::toHex(_data) + "]";
+		m_state.trace.emplace_back(std::move(message));
+		if (m_state.maxTraceSize > 0 && m_state.trace.size() >= m_state.maxTraceSize)
+		{
+			m_state.trace.emplace_back("Trace size limit reached.");
+			BOOST_THROW_EXCEPTION(TraceLimitReached());
+		}
 	}
 }

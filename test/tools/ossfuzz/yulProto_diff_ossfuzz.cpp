@@ -91,7 +91,8 @@ DEFINE_PROTO_FUZZER(Program const& _input)
 	yulFuzzerUtil::TerminationReason termReason = yulFuzzerUtil::interpret(
 		os1,
 		stack.parserResult()->code,
-		EVMDialect::strictAssemblyForEVMObjects(version)
+		EVMDialect::strictAssemblyForEVMObjects(version),
+		true
 	);
 
 	if (yulFuzzerUtil::resourceLimitsExceeded(termReason))
@@ -107,12 +108,18 @@ DEFINE_PROTO_FUZZER(Program const& _input)
 	termReason = yulFuzzerUtil::interpret(
 		os2,
 		astBlock,
-		EVMDialect::strictAssemblyForEVMObjects(version)
+		EVMDialect::strictAssemblyForEVMObjects(version),
+		true
 	);
 	if (yulFuzzerUtil::resourceLimitsExceeded(termReason))
 		return;
 
 	bool isTraceEq = (os1.str() == os2.str());
-	yulAssert(isTraceEq, "Interpreted traces for optimized and unoptimized code differ.");
+	if (!isTraceEq)
+	{
+		cout << os1.str() << endl;
+		cout << os2.str() << endl;
+		yulAssert(false, "Interpreted traces for optimized and unoptimized code differ.");
+	}
 	return;
 }
