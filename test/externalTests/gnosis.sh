@@ -27,32 +27,35 @@ source test/externalTests/common.sh
 verify_input "$1"
 SOLJSON="$1"
 
-function compile_fn { npx truffle compile; }
+function compile_fn { npm run build; }
 function test_fn { npm test; }
 
 function gnosis_safe_test
 {
-    local repo="https://github.com/solidity-external-tests/safe-contracts.git"
-    local branch=development_080
-    local config_file="truffle-config.js"
+    local repo="https://github.com/gnosis/safe-contracts.git"
+    local branch=main
+    local config_file="hardhat.config.ts"
     local min_optimizer_level=2
     local max_optimizer_level=3
 
     setup_solcjs "$DIR" "$SOLJSON"
     download_project "$repo" "$branch" "$DIR"
 
-    sed -i 's|github:gnosis/mock-contract#sol_0_5_0|github:solidity-external-tests/mock-contract#master_080|g' package.json
+    # NOTE: The patterns below intentionally have hard-coded versions.
+    # When the upstream updates them, there's a chance we can just remove the regex.
+    sed -i 's|"@gnosis\.pm/mock-contract": "\^4\.0\.0"|"@gnosis.pm/mock-contract": "github:solidity-external-tests/mock-contract#master_080"|g' package.json
+    sed -i 's|"@openzeppelin/contracts": "\^3\.4\.0"|"@openzeppelin/contracts": "^4.0.0"|g' package.json
 
     neutralize_package_lock
     neutralize_package_json_hooks
-    force_truffle_compiler_settings "$config_file" "${DIR}/solc" "$min_optimizer_level"
-    npm install --package-lock
+    force_hardhat_compiler_binary "$config_file" "$SOLJSON"
+    force_hardhat_compiler_settings "$config_file" "$min_optimizer_level"
+    npm install
 
     replace_version_pragmas
-    force_solc_modules "${DIR}/solc"
 
     for level in $(seq "$min_optimizer_level" "$max_optimizer_level"); do
-        truffle_run_test "$config_file" "${DIR}/solc" "$level" compile_fn test_fn
+        hardhat_run_test "$config_file" "$level" compile_fn test_fn
     done
 }
 

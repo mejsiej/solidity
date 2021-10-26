@@ -162,7 +162,9 @@ function force_hardhat_compiler_binary
     echo "-------------------------------------"
     echo "Config file: ${config_file}"
     echo "Compiler path: ${solc_path}"
-    hardhat_solc_build_subtask "$SOLCVERSION_SHORT" "$SOLCVERSION" "$solc_path" >> "$config_file"
+
+    local language="${config_file##*.}"
+    hardhat_solc_build_subtask "$SOLCVERSION_SHORT" "$SOLCVERSION" "$solc_path" "$language" >> "$config_file"
 }
 
 function force_hardhat_compiler_settings
@@ -181,10 +183,14 @@ function force_hardhat_compiler_settings
     echo "Compiler version (full): ${SOLCVERSION}"
     echo "-------------------------------------"
 
-    {
-        echo -n 'module.exports["solidity"] = '
-        hardhat_compiler_settings "$SOLCVERSION_SHORT" "$level" "$evm_version"
-    } >> "$config_file"
+    local settings
+    settings=$(hardhat_compiler_settings "$SOLCVERSION_SHORT" "$level" "$evm_version")
+    if [[ $config_file == *\.js ]]; then
+        echo "module.exports['solidity'] = ${settings}" >> "$config_file"
+    else
+        [[ $config_file == *\.ts ]] || assertFail
+        echo "userConfig.solidity = {compilers: [${settings}]}"  >> "$config_file"
+    fi
 }
 
 function truffle_verify_compiler_version
@@ -202,8 +208,12 @@ function hardhat_verify_compiler_version
     local full_solc_version="$2"
 
     printLog "Verify that the correct version (${solc_version}/${full_solc_version}) of the compiler was used to compile the contracts..."
-    grep '"solcVersion": "'"${solc_version}"'"' --with-filename artifacts/build-info/*.json || fail "Wrong compiler version detected."
-    grep '"solcLongVersion": "'"${full_solc_version}"'"' --with-filename artifacts/build-info/*.json || fail "Wrong compiler version detected."
+    local build_info_files
+    build_info_files=$(find . -path '*artifacts/build-info/*.json')
+    for build_info_file in $build_info_files; do
+        grep '"solcVersion": "'"${solc_version}"'"' --with-filename "$build_info_file" || fail "Wrong compiler version detected in ${build_info_file}."
+        grep '"solcLongVersion": "'"${full_solc_version}"'"' --with-filename "$build_info_file" || fail "Wrong compiler version detected in ${build_info_file}."
+    done
 }
 
 function truffle_clean
@@ -266,11 +276,22 @@ function hardhat_solc_build_subtask {
     local solc_version="$1"
     local full_solc_version="$2"
     local solc_path="$3"
+    local language="$4"
 
-    echo "const {TASK_COMPILE_SOLIDITY_GET_SOLC_BUILD} = require('hardhat/builtin-tasks/task-names');"
-    echo "const assert = require('assert');"
-    echo
-    echo "subtask(TASK_COMPILE_SOLIDITY_GET_SOLC_BUILD, async (args, hre, runSuper) => {"
+    if [[ $language == js ]]; then
+        echo "const {TASK_COMPILE_SOLIDITY_GET_SOLC_BUILD} = require('hardhat/builtin-tasks/task-names');"
+        echo "const assert = require('assert');"
+        echo
+        echo "subtask(TASK_COMPILE_SOLIDITY_GET_SOLC_BUILD, async (args, hre, runSuper) => {"
+    else
+        [[ $language == ts ]] || assertFail
+        echo "import {TASK_COMPILE_SOLIDITY_GET_SOLC_BUILD} from 'hardhat/builtin-tasks/task-names';"
+        echo "import assert = require('assert');"
+        echo "import {subtask} from 'hardhat/config';"
+        echo
+        echo "subtask(TASK_COMPILE_SOLIDITY_GET_SOLC_BUILD, async (args: any, _hre: any, _runSuper: any) => {"
+    fi
+
     echo "    assert(args.solcVersion == '${solc_version}', 'Unexpected solc version: ' + args.solcVersion)"
     echo "    return {"
     echo "        compilerPath: '$(realpath "$solc_path")',"

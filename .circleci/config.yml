@@ -1202,13 +1202,6 @@ workflows:
           name: t_ems_compile_ext_gnosis
           project: gnosis
           compile_only: 1
-          nodejs_version: '14'
-      - t_ems_ext:
-          <<: *workflow_emscripten
-          name: t_ems_compile_ext_gnosis_v2
-          project: gnosis-v2
-          compile_only: 1
-          nodejs_version: '14'
       - t_ems_ext:
           <<: *workflow_emscripten
           name: t_ems_compile_ext_zeppelin
@@ -1221,21 +1214,12 @@ workflows:
           compile_only: 1
           # NOTE: One of the dependencies (fsevents) fails to build its native extension on node.js 12+.
           nodejs_version: '10'
-
-      # FIXME: Gnosis tests are pretty flaky right now. They often fail on CircleCI due to random ProviderError
-      # and there are also other less frequent problems. See https://github.com/gnosis/safe-contracts/issues/216.
-      #- t_ems_ext:
-      #    <<: *workflow_emscripten
-      #    name: t_ems_test_ext_gnosis
-      #    project: gnosis
-      #    # NOTE: Tests do not start on node.js 14 ("ganache-cli exited early with code 1").
-      #    nodejs_version: '12'
       - t_ems_ext:
           <<: *workflow_emscripten
-          name: t_ems_test_ext_gnosis_v2
-          project: gnosis-v2
-          # NOTE: Tests do not start on node.js 14 ("ganache-cli exited early with code 1").
-          nodejs_version: '12'
+          name: t_ems_test_ext_gnosis
+          project: gnosis
+          # NOTE: Tests crash on nodejs 17: "Error: error:0308010C:digital envelope routines::unsupported"
+          nodejs_version: '16'
       - t_ems_ext:
           <<: *workflow_emscripten
           name: t_ems_test_ext_zeppelin
