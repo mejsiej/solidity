@@ -125,7 +125,8 @@ protected:
 	/// i.e. `_otherStorage` and `_otherMemory` cannot have additional changes.
 	void joinKnowledge(
 		std::unordered_map<YulString, YulString> const& _olderStorage,
-		std::unordered_map<YulString, YulString> const& _olderMemory
+		std::unordered_map<YulString, YulString> const& _olderMemory,
+		std::map<std::pair<YulString, YulString>, YulString> const& _olderKeccak
 	);
 
 	static void joinKnowledgeHelper(
@@ -159,6 +160,10 @@ protected:
 		Expression const& _expression
 	) const;
 
+	/// Checks if the expression is keccak256(s, l)
+	/// where s and l are variables and returns these variables in that case.
+	std::optional<std::pair<YulString, YulString>> isKeccak(Expression const& _expression) const;
+
 	Dialect const& m_dialect;
 	/// Side-effects of user-defined functions. Worst-case side-effects are assumed
 	/// if this is not provided or the function is not found.
@@ -171,6 +176,8 @@ protected:
 
 	std::unordered_map<YulString, YulString> m_storage;
 	std::unordered_map<YulString, YulString> m_memory;
+	/// If m_keccak[s, l] = y then y := keccak256(s, l) occurs in the code.
+	std::map<std::pair<YulString, YulString>, YulString> m_keccak;
 
 	KnowledgeBase m_knowledgeBase;
 
