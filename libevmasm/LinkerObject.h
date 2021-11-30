@@ -60,8 +60,9 @@ struct LinkerObject
 	/// Appends the bytecode of @a _other and incorporates its link references.
 	void append(LinkerObject const& _other);
 
-	/// Links the given libraries by replacing their uses in the code and removes them from the references.
-	void link(std::map<std::string, util::h160> const& _libraryAddresses, bool printUnusedLinks = false);
+	/// Links the given libraries by replacing their uses in the code, removes them from the references,
+	/// and returns the map of the libraries that have been replaced.
+	std::map<std::string, util::h160> link(std::map<std::string, util::h160> const& _libraryAddresses);
 
 	/// @returns a hex representation of the bytecode of the given object, replacing unlinked
 	/// addresses by placeholders. This output is lowercase.

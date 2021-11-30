@@ -696,13 +696,21 @@ bool CompilerStack::compile(State _stopAfter)
 					}
 				}
 	m_stackState = CompilationSuccessful;
-	this->link();
+
+	std::map<std::string, util::h160> usedLibs = this->link();
+	for (auto lib: m_libraries)
+	{
+		if (usedLibs.find(lib.first) == usedLibs.end() || usedLibs.size() == 0)
+			std::cout << "Unused link reference: '" << lib.first << "'. Library not found." << std::endl;
+	}
 	return true;
 }
 
-void CompilerStack::link()
+std::map<std::string, util::h160> CompilerStack::link()
 {
 	solAssert(m_stackState >= CompilationSuccessful, "");
+
+	std::map<std::string, util::h160> usedLibs;
 
 	for (auto& contract: m_contracts)
 	{
@@ -714,12 +722,12 @@ void CompilerStack::link()
 					contract.second.object.linkReferences[contract.second.object.bytecode.size()] = library.first;
 					contract.second.object.bytecode.resize(contract.second.object.bytecode.size() + 20);
 				}
-		if (contract.second.contract->contractKind() != solidity::frontend::ContractKind::Library)
-			contract.second.object.link(m_libraries, true);
-		else
-			contract.second.object.link(m_libraries);
+		auto libs = contract.second.object.link(m_libraries);
+		usedLibs.insert(libs.begin(), libs.end());
 		contract.second.runtimeObject.link(m_libraries);
 	}
+
+	return usedLibs;
 }
 
 vector<string> CompilerStack::contractNames() const

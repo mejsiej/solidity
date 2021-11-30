@@ -437,7 +437,7 @@ private:
 
 	/// Links all the known library addresses in the available objects. Any unknown
 	/// library will still be kept as an unlinked placeholder in the objects.
-	void link();
+	std::map<std::string, util::h160> link();
 
 	/// @returns the contract object for the given @a _contractName.
 	/// Can only be called after state is CompilationSuccessful.
