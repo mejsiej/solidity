@@ -1090,6 +1090,9 @@ bool CommandLineInterface::assemble(yul::AssemblyStack::Language _language, yul:
 		}
 	}
 
+	if (m_options.compiler.outputs == CompilerOutputs{})
+		serr() << "Assembler run successful, no output requested." << endl;
+
 	return true;
 }
 
